@@ -5,19 +5,17 @@ from datetime import datetime
 from typing import Annotated
 from typing_extensions import TypedDict
 from langgraph.graph.message import AnyMessage, add_messages
-from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 from dotenv import load_dotenv
-from agent_tools import lookup_faq, get_daily_park_data, handle_resignation
+from ai_backend.agent_tools import lookup_faq, get_daily_park_data, handle_resignation
 
 load_dotenv()
 
 azure_openai_api_version: str = "2023-05-15"
 azure_deployment = "gpt-4o-mini"
-
 
 llm = AzureChatOpenAI(
     azure_deployment=azure_deployment,
@@ -57,21 +55,19 @@ def create_primary_prompt():
         Använd de verktyg som du har tillgång till, så som handle_resignation, lookup_FAQ och get_daily_park_data för att hjälpa medarbetaren.
         När du skickar query till lookup_faq, formulera en fråga som är semantiskt lik den fråga användaren ställer.
         Svara detaljerat och steg-för-steg, och inkludera alla relevanta instruktioner eller detaljer.
-        Om information saknas, informera användaren och föreslå att de kontaktar Artistservice. 
-        Om du inte anropar ett verktyg eller om svaret på användarens frågor in finns i de svar du får från verktygen,
-        så måste du svara att du inte kan svara på frågan och föreslå att användaren kontaktar Artistservice.
         
-        Instruktioner: Svara aldrig på frågor som är utanför din kompetensområde. Om du inte kan svara på en fråga, föreslå att användaren kontaktar Artistservice.
+        Viktiga instruktioner: Svara aldrig på frågor som bygger på information som ligger utanför den du kan hämta från verktygen. 
+        Om du inte kan svara med hjälp av information från verktygen, så uppge det för användaren och föreslå vänligt att personen kan kontakta Artistservice.
         
         """),
         ("placeholder", "{messages}")
     ]).partial(current_date=datetime.today().strftime("%Y-%m-%d"))
 
 
-
 def create_assistant_runnable(llm, tools):
     primary_prompt = create_primary_prompt()
     return primary_prompt | llm.bind_tools(tools)
+
 
 tools = [lookup_faq, get_daily_park_data, handle_resignation]
 assistant_runnable = create_assistant_runnable(llm, tools)
