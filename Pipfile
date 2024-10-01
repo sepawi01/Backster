@@ -1,0 +1,28 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+beautifulsoup4 = "*"
+httpx = "*"
+pydantic = "*"
+langchain = "*"
+python-dotenv = "*"
+azure-storage-blob = "*"
+langchain-community = "*"
+langchain-openai = "*"
+azure-search-documents = "*"
+azure-identity = "*"
+azure-data-tables = "*"
+pandas = "*"
+langgraph = "*"
+
+[dev-packages]
+jupyter = "*"
+
+[requires]
+python_version = "3.12"
+python_full_version = "3.12.0"
