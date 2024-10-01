@@ -17,7 +17,22 @@ function App() {
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const key = queryParams.get('key');
-    const park = queryParams.get('park');
+    const parkParam = queryParams.get('park') || 'glt';
+    const parkMap: Record<string, string> = {
+        'glt': 'Gröna Lund',
+        'kdp': 'Kolmården',
+        'fvp': 'Furuvik',
+        'ssl': 'Skara Sommarland',
+    }
+    const park = parkMap[parkParam];
+    const parkStyles: Record<string, string> = {
+        'glt': 'bg-glt-primary-600 text-white',
+        'kdp': 'bg-kdp-primary-600 text-white',
+        'fvp': 'bg-fvp-primary-600 text-white',
+        'ssl': 'bg-ssl-primary-600 text-white',
+    }
+    const parkStyle = parkStyles[parkParam];
+
 
 
     useEffect(() => {
@@ -26,7 +41,8 @@ function App() {
 
     useEffect(() => {
 
-
+        console.log("ParkParam: ", parkParam);
+        console.log("Park: ", park);
         // Fetch the JWT token from the response headers when the app is loaded
         const fetchToken = async () => {
 
@@ -102,7 +118,7 @@ function App() {
                         )}
                         <div
                             className={`inline-block p-3 rounded-lg ${
-                                message.fromBot ? "bg-glt-primary-600 text-white" : "bg-gray-200 text-black"
+                                message.fromBot ? parkStyle : "bg-gray-200 text-black"
                             }`}
                             style={{maxWidth: "80%"}}
                         >
@@ -125,15 +141,15 @@ function App() {
                         onChange={(e) => setInputValue(e.target.value)}
                         rows={1}
                         style={{maxHeight: "450px", overflowY: "auto"}}
-                    />
-                    <HiArrowCircleUp size={"3em"} className="cursor-pointer text-gray-600"
-                                     onClick={sendMessage}
-                                     onKeyDown={(e) => {
+                        onKeyDown={(e) => {
                                          if (e.key === 'Enter' && !e.shiftKey) {
                                              e.preventDefault();
                                              sendMessage();
                                          }
                                      }}
+                    />
+                    <HiArrowCircleUp size={"3em"} className="cursor-pointer text-gray-600"
+                                     onClick={sendMessage}
                     />
                 </div>
             </div>
