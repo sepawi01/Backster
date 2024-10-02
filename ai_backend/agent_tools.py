@@ -9,40 +9,43 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import AzureOpenAIEmbeddings
 
-
 embeddings_model = AzureOpenAIEmbeddings(
     model="text-embedding-ada-002",
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     openai_api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
-search_client = SearchClient(os.getenv("AZURE_AI_SEARCH_ENDPOINT"), "backster-first", AzureKeyCredential(os.getenv("AZURE_AI_SEARCH_API_KEY")))
-def hybrid_search(query: str, park: str, print_result: bool = False):
+search_client = SearchClient(os.getenv("AZURE_AI_SEARCH_ENDPOINT"), "backster-first",
+                             AzureKeyCredential(os.getenv("AZURE_AI_SEARCH_API_KEY")))
+
+
+def hybrid_search(query: str, park: str, annual_employee: bool, seasonal_employee: bool):
     embedded_query = embeddings_model.embed_query(query)
     content_vector_query = VectorizedQuery(vector=embedded_query, k_nearest_neighbors=3, fields="contentVector")
-    # title_vector_query = VectorizedQuery(vector=embedded_query, k_nearest_neighbors=3, fields="titleVector")
-    # ai_summary_vector_query = VectorizedQuery(vector=embedded_query, k_nearest_neighbors=3, fields="AiSummaryVector")
+
+    # Construct filter
+    combined_filter = f"park eq '{park}'"
+    # Add conditions for employee type
+    employee_filters = []
+    if annual_employee:
+        employee_filters.append("annual_employee eq true")
+    if seasonal_employee:
+        employee_filters.append("seasonal_employee eq true")
+
+    # Add combined filter if any employee filters are present
+    if employee_filters:
+        combined_filter += f" and ({' or '.join(employee_filters)})"
 
     results = search_client.search(
         search_text=query,
         vector_queries=[content_vector_query],
         select=["title", "content", "park", "source", "id", "message_id"],
         top=3,
-        filter=f"park eq '{park}'"
+        filter=combined_filter
     )
     results = list(results)
-
-    if print_result:
-        for result in results:
-            print("##########################################")
-            print(f"Source: {result['source']}")
-            print(f"Message id: {result['message_id']}")
-            print(f"Doc_id: {result['id']}")
-            print(f"Score: {result['@search.score']}")
-            print(f"Content: {result['content']}")
-            print("##########################################\n\n")
-
     return results
+
 
 def handle_tool_error(state) -> dict:
     error = state.get("error")
@@ -80,10 +83,15 @@ def _print_event(event: dict, _printed: set, max_length=1500):
 
 
 @tool
-def lookup_faq(query: str, park: str) -> str:
-    """Searches the companys FAQ knowledge base to find answers for users questions.
-    Use this before answering a users question"""
-    rag_results = hybrid_search(query, park)
+def lookup_faq(query: str, park: str, employment_type: Literal['Tillsvidare', 'Säsong/Visstid']) -> str:
+    """Searches the companys internal knowledge base to find answers for users questions.
+    Always use this tool before answering a users question. It will give you the most relevant information you
+    have access to in regard to the employees question."""
+    rag_results = hybrid_search(query,
+                                park,
+                                annual_employee=employment_type == "Tillsvidare",
+                                seasonal_employee=employment_type == "Säsong/Visstid"
+                                )
     sources = [result["source"] for result in rag_results]
     context = "\n".join([content["content"] for content in rag_results])
     return context

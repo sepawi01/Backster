@@ -10,14 +10,18 @@ function App() {
     const [messages, setMessages] = useState([
         {
             fromBot: true,
-            text: "Hej! Jag heter Backster och finns här för att hjälpa dig med dina arbetsrelaterade frågor. " +
-                "Vad kan jag hjälpa dig med idag? 💫"
+            text: "Hej! Jag heter Backster och finns här för att hjälpa dig med dina arbetsrelaterade frågor." +
+                " För att bättre kunna hjälpa dig med relevant information kring din anställning så undrar jag vilken anställningsform du har?"
         },
+
     ]);
+    const [employmentType, setEmploymentType] = useState<string | null>(null);
     const [token, setToken] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
+    const [_, setContents] = useState<string[]>([]);
+    const [sources, setSources] = useState<string[]>([]);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const key = queryParams.get('key');
@@ -38,39 +42,37 @@ function App() {
     const parkStyle = parkStyles[parkParam];
 
     useEffect(() => {
-        // Scroll to bottom when new messages are added
+        // Scrolla till botten när nya meddelanden läggs till
         if (endOfMessagesRef.current) {
-            endOfMessagesRef.current.scrollIntoView({ behavior: "smooth" });
+            endOfMessagesRef.current.scrollIntoView({behavior: "smooth"});
         }
     }, [messages]);
 
     useEffect(() => {
-        // Adjust the height of the textarea as the user types
+        // Justera höjden på textarea när användaren skriver
         adjustTextAreaHeight();
     }, [inputValue]);
 
     useEffect(() => {
-
         console.log("ParkParam: ", parkParam);
         console.log("Park: ", park);
-        // Fetch the JWT token from the response headers when the app is loaded
+        // Hämta JWT-token från backend när appen laddas
         const fetchToken = async () => {
-
             try {
                 const response = await fetch(`/token?key=${key}`);
                 if (!response.ok) {
-                    console.error("Failed to fetch token:", response.statusText);
+                    console.error("Misslyckades att hämta token:", response.statusText);
                     return;
                 }
-                const data = await response.json(); // Parse the response to JSON
-                const token = data.token; // Get the token from the parsed JSON
+                const data = await response.json();
+                const token = data.token;
                 if (token) {
                     setToken(token);
                 } else {
-                    console.error("Token not found in the response headers");
+                    console.error("Token hittades inte i svaret");
                 }
             } catch (error) {
-                console.error("Error fetching token:", error);
+                console.error("Fel vid hämtning av token:", error);
             }
         };
         fetchToken();
@@ -83,8 +85,17 @@ function App() {
         }
     };
 
+    const handleEmploymentTypeSelection = (type: string) => {
+        setEmploymentType(type);
+        setMessages((prevMessages) => [
+            ...prevMessages,
+            {fromBot: false, text: type},
+            {fromBot: true, text: 'Tack, vad kan jag hjälpa dig med idag?'}
+        ]);
+    };
+
     const sendMessage = async () => {
-        if (!inputValue.trim() || !token) return; // Ensure token is available
+        if (!inputValue.trim() || !token || employmentType === null) return;
         setInputValue("");
         setIsTyping(true);
 
@@ -92,27 +103,30 @@ function App() {
         setMessages(newMessages);
 
         try {
-            const response = await fetch(`/chat?token=${token}`, { // Send the token as a query parameter
+            const response = await fetch(`/chat?token=${token}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    session_id: token, // Use the token as the session ID
+                    session_id: token,
                     query: inputValue,
                     park: park,
+                    employmentType: employmentType
                 }),
             });
 
             const data = await response.json();
             setMessages([...newMessages, {fromBot: true, text: data.text}]);
+            setContents(data.contents);
+            setSources(data.sources);
+            console.log("Sources: ", data.sources);
+            console.log("Contents: ", data.contents);
         } catch (error) {
-            console.error("Error communicating with the backend:", error);
+            console.error("Fel vid kommunikation med backend:", error);
         } finally {
             setIsTyping(false);
         }
-
-
     };
 
     return (
@@ -122,7 +136,7 @@ function App() {
                 <img src="static/PRS_black_Sc_rgb.jpg" alt="PRS Logo" className="h-8 m-2"/>
             </div>
 
-            {/* Chat Area */}
+            {/* Chat area */}
             <div className="flex-grow overflow-y-auto p-4">
                 {messages.map((message, index) => (
                     <div key={index} className={`my-2 flex ${message.fromBot ? "justify-start" : "justify-end"}`}>
@@ -136,17 +150,51 @@ function App() {
                             }`}
                             style={{maxWidth: "80%"}}
                         >
-                            {/* Render markdown-content */}
-                            <div className={`prose ${message.fromBot ? "prose-white" : "text-black"}`}>
+                            {/* Render markdown-output */}
+                            <div className={`prose mb-2 ${message.fromBot ? "prose-white" : "text-black"}`}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {message.text}
                                 </ReactMarkdown>
+                                {message.fromBot && index > 2 && <hr className="my-4 border-t border-gray-300" />}
+                                {message.fromBot  && sources.length > 0 && index > 2 && sources.map((source, index) => {
+                                    return (
+                                        <div key={index}>
+                                            <p className="text-xs">{source}</p>
+                                        </div>
+                                    )
+
+                                })
+                                }
+                                {message.fromBot && index > 2 && <p className="text-xs text-gray-500">Ai-genererat.</p>}
+
                             </div>
                         </div>
                     </div>
                 ))}
+                {/* Show buttons for employment type selection */}
+                {employmentType === null && (
+                    <div className="my-2 flex justify-end">
+                        <div className="inline-block p-3 rounded-lg bg-gray-200 text-black">
+                            Välj anställningsform:
+                            <div className="flex flex-col gap-2 p-2">
+                                <button
+                                    className={`mt-2 p-2 rounded-lg bg-glt-tertiary-300`}
+                                    onClick={() => handleEmploymentTypeSelection('Tillsvidare')}
+                                >
+                                    Tillsvidare
+                                </button>
+                                <button
+                                    className={`p-2 rounded-lg bg-glt-tertiary-300`}
+                                    onClick={() => handleEmploymentTypeSelection('Säsong/Visstid')}
+                                >
+                                    Säsong/Visstidsanställd
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <div ref={endOfMessagesRef}/>
-                {/* Show BeatLoader when bot is typing */}
+                {/* Show loading spinner when bot is typing */}
                 {isTyping && (
                     <div className={"flex justify-start p-4"}>
                         <BeatLoader size={10} color="#868585"/>
@@ -154,10 +202,11 @@ function App() {
                 )}
             </div>
 
-            {/* Input Area */}
+            {/* Input area */}
             <div className="p-2 m-3 bg-gray-100 rounded-3xl">
                 <div className="flex items-center">
                     <textarea
+                        disabled={employmentType === null}
                         ref={textareaRef}
                         className="flex-grow p-2 mr-2 bg-gray-100 rounded-lg outline-none resize-none"
                         placeholder="Skriv din fråga här..."

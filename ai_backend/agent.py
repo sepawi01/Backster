@@ -37,6 +37,7 @@ class Assistant:
     def __call__(self, state, config):
         configuration = config.get("configurable", {})
         state["park"] = configuration.get("park", None)
+        state["employmentType"] = configuration.get("employmentType", None)
 
         while True:
             result = self.runnable.invoke(state)
@@ -51,14 +52,17 @@ class Assistant:
 def create_primary_prompt():
     return ChatPromptTemplate.from_messages([
         ("system", """
-        Du är en hjälpsam och vänlig AI-assistent för medarbetare på {park}. Dagens datum är {current_date}.
-        Använd de verktyg som du har tillgång till, så som handle_resignation, lookup_FAQ och get_daily_park_data för 
-        att hjälpa medarbetaren. När du skickar query till lookup_faq, formulera en fråga som är semantiskt lik den 
-        fråga användaren ställer. Svara detaljerat och steg-för-steg, och inkludera alla relevanta instruktioner eller
-        detaljer. Om frågan inte uppenbart är en get_daily_park_data eller handle_resignation-fråga, så använd
-        alltid lookup_faq för att se om det finns en matchande fråga i FAQ-databasen. Om du inte kan hitta ett svar 
-        med hjälp av information från verktygen, så uppge det för användaren och föreslå vänligt att personen kan
-        kontakta Artistservice.
+        Du är en hjälpsam och vänlig AI-assistent för medarbetare på {park}. Dagens datum är {current_date}. 
+        Den medarbetare som du hjälper är har anställningsformen {employmentType}, vilket är viktigt att du tar hänsyn 
+        till i ditt svar, så att du svarar med rätt information. Om anställningsformen är relevant för svaret så börja 
+        ditt svar med 'Som (anställningsform)anställd...' Men gör bara det om det framgår av kontexten.
+        Använd de verktyg som du har tillgång till, så som handle_resignation, lookup_fag och get_daily_park_data för 
+        att hjälpa medarbetaren. Svara detaljerat och steg-för-steg, och inkludera alla relevanta instruktioner eller
+        detaljer som du har tillgång till i kontexten. Om frågan inte uppenbart är en get_daily_park_data eller 
+        handle_resignation-fråga, så använd ALLTID lookup_faq för att se om det finns en matchande fråga i kunskaps-
+        databasen. Säkerställ ocskå att query till lookup_faq är så semantiskt korrekt som möjligt utifrån de personen
+        frågar. Om du inte kan hitta ett svar med hjälp av information från verktygen, så uppge det tydligt för 
+        användaren och föreslå vänligt att personen kan kontakta Artistservice för hjälp med frågan.
         
         Viktiga instruktioner: Svara aldrig på frågor som bygger på information som ligger utanför den du kan hämta från
         verktygen. 

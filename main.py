@@ -7,9 +7,9 @@ from fastapi.staticfiles import StaticFiles
 import os
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-
 load_dotenv()
 
+from ai_backend.agent_tools import hybrid_search
 from ai_backend import agent
 
 app = FastAPI()
@@ -35,6 +35,7 @@ class MessageRequest(BaseModel):
     session_id: str
     query: str
     park: str
+    employmentType: str
 
 def get_key(key: str = Query(...)):
     if key != KEY:
@@ -69,10 +70,23 @@ async def get_token(key: str = Depends(get_key)):
 
 @app.post("/chat")
 async def chat_with_agent(request: MessageRequest, token: str = Depends(validate_token)):
-    config = {"configurable": {"park": request.park, "thread_id": request.session_id}}
+    config = {"configurable": {
+        "park": request.park,
+        "employmentType": request.employmentType,
+        "thread_id": request.session_id
+    }}
     state = {"messages": [("user", request.query)]}
-
+    # Probably a smarter way to pass the search results from the agent tool, or pass this to the agent.
+    # But this will do for now. We are doing a search two times, once here and once in the agent tool.
+    # This is not optimal.
+    results = hybrid_search(request.query,
+                            request.park,
+                            request.employmentType == "Tillsvidare",
+                            request.employmentType == "Säsong/Visstid"
+                            )
+    sources = [result["source"] for result in results]
+    contents = [content["content"] for content in results]
     response = agent.graph.invoke(state, config)
     answer = response['messages'][-1].content
 
-    return {'fromBot': True, "text": answer}
+    return {'fromBot': True, "text": answer, "sources": sources, "contents": contents}
