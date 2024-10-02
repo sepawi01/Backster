@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.prose-white {
+  color: white;
+}
+
+.prose-white h1,
+.prose-white h2,
+.prose-white h3,
+.prose-white h4,
+.prose-white h5,
+.prose-white h6,
+.prose-white p,
+.prose-white ul,
+.prose-white ol,
+.prose-white li,
+.prose-white li::marker,
+.prose-white strong,
+.prose-white em,
+.prose-white a,
+.prose-white blockquote,
+.prose-white code,
+.prose-white pre,
+.prose-white th,
+.prose-white td {
+  color: white !important;
+}

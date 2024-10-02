@@ -1,7 +1,9 @@
 import {useState, useRef, useEffect} from "react";
 import {HiArrowCircleUp} from "react-icons/hi";
-import { useLocation } from 'react-router-dom';
-
+import {useLocation} from 'react-router-dom';
+import {BeatLoader} from 'react-spinners';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 function App() {
     const [inputValue, setInputValue] = useState("");
@@ -13,7 +15,9 @@ function App() {
         },
     ]);
     const [token, setToken] = useState("");
+    const [isTyping, setIsTyping] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const key = queryParams.get('key');
@@ -33,9 +37,15 @@ function App() {
     }
     const parkStyle = parkStyles[parkParam];
 
-
+    useEffect(() => {
+        // Scroll to bottom when new messages are added
+        if (endOfMessagesRef.current) {
+            endOfMessagesRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages]);
 
     useEffect(() => {
+        // Adjust the height of the textarea as the user types
         adjustTextAreaHeight();
     }, [inputValue]);
 
@@ -75,6 +85,8 @@ function App() {
 
     const sendMessage = async () => {
         if (!inputValue.trim() || !token) return; // Ensure token is available
+        setInputValue("");
+        setIsTyping(true);
 
         const newMessages = [...messages, {fromBot: false, text: inputValue}];
         setMessages(newMessages);
@@ -96,9 +108,11 @@ function App() {
             setMessages([...newMessages, {fromBot: true, text: data.text}]);
         } catch (error) {
             console.error("Error communicating with the backend:", error);
+        } finally {
+            setIsTyping(false);
         }
 
-        setInputValue("");
+
     };
 
     return (
@@ -122,12 +136,22 @@ function App() {
                             }`}
                             style={{maxWidth: "80%"}}
                         >
-                            {message.text.split("\n").map((line, idx) => (
-                                <p key={idx} className="mb-1">{line}</p>
-                            ))}
+                            {/* Render markdown-content */}
+                            <div className={`prose ${message.fromBot ? "prose-white" : "text-black"}`}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {message.text}
+                                </ReactMarkdown>
+                            </div>
                         </div>
                     </div>
                 ))}
+                <div ref={endOfMessagesRef}/>
+                {/* Show BeatLoader when bot is typing */}
+                {isTyping && (
+                    <div className={"flex justify-start p-4"}>
+                        <BeatLoader size={10} color="#868585"/>
+                    </div>
+                )}
             </div>
 
             {/* Input Area */}
@@ -142,11 +166,11 @@ function App() {
                         rows={1}
                         style={{maxHeight: "450px", overflowY: "auto"}}
                         onKeyDown={(e) => {
-                                         if (e.key === 'Enter' && !e.shiftKey) {
-                                             e.preventDefault();
-                                             sendMessage();
-                                         }
-                                     }}
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                sendMessage();
+                            }
+                        }}
                     />
                     <HiArrowCircleUp size={"3em"} className="cursor-pointer text-gray-600"
                                      onClick={sendMessage}
