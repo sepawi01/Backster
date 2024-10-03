@@ -88,17 +88,11 @@ async def chat_with_agent(request: MessageRequest, token: str = Depends(validate
         "thread_id": request.session_id
     }}
     state = {"messages": [("user", request.query)]}
-    # Probably a smarter way to pass the search results from the agent tool, or pass this to the agent.
-    # But this will do for now. We are doing a search two times, once here and once in the agent tool.
-    # This is not optimal.
-    results = hybrid_search(request.query,
-                            request.park,
-                            request.employmentType == "Tillsvidare",
-                            request.employmentType == "Säsong/Visstid"
-                            )
-    sources = [result["source"] for result in results]
-    contents = [content["content"] for content in results]
+
     response = agent.graph.invoke(state, config)
     answer = response['messages'][-1].content
+    state = response.get('state', {})
+    sources = state.get('sources', [])
+    contents = state.get('original_contents', [])
 
     return {'fromBot': True, "text": answer, "sources": sources, "contents": contents}

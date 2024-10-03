@@ -39,8 +39,8 @@ def hybrid_search(query: str, park: str, annual_employee: bool, seasonal_employe
     results = search_client.search(
         search_text=query,
         vector_queries=[content_vector_query],
-        select=["title", "content", "park", "source", "id", "message_id"],
-        top=3,
+        select=["title", "content", "park", "source", "id", "original_content", "message_id"],
+        top=4,
         filter=combined_filter
     )
     results = list(results)
@@ -93,8 +93,9 @@ def lookup_faq(query: str, park: str, employment_type: Literal['Tillsvidare', 'S
                                 seasonal_employee=employment_type == "Säsong/Visstid"
                                 )
     sources = [result["source"] for result in rag_results]
+    original_contents = [content["original_content"] for content in rag_results]
     context = "\n".join([content["content"] for content in rag_results])
-    return context
+    return {"context": context, "sources": sources, "original_contents": original_contents}
 
 
 @tool

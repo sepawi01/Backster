@@ -28,6 +28,11 @@ llm = AzureChatOpenAI(
 
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
+    sources: list[str]
+    original_contents: list[str]
+    park: str
+    employmentType: str
+
 
 
 class Assistant:
@@ -44,9 +49,12 @@ class Assistant:
             if not result.tool_calls and not result.content:
                 state["messages"].append(("user", "Respond with a real output."))
             else:
+                if isinstance(result.content, dict) and 'sources' in result.content:
+                    state['sources'] = result.content['sources']
+                    state['original_contents'] = result.content['original_contents']
                 break
 
-        return {"messages": result}
+        return {"messages": result, "state": state}
 
 
 def create_primary_prompt():
