@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 import os
+import logging
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 load_dotenv()
@@ -39,10 +40,11 @@ class MessageRequest(BaseModel):
 
 
 def verify_referer(request: Request):
+    """Make sure the request comes from a valid referer"""
     referer = request.headers.get('referer')
-    allowed_referer = "https://backstage.prs.se"
+    allowed_referers = ["https://backstage.prs.se", "https://app.actimo.com/"]
 
-    if not referer or not referer.startswith(allowed_referer):
+    if not referer or not any(referer.startswith(allowed) for allowed in allowed_referers):
         raise HTTPException(status_code=403, detail="Not authenticated")
 
 def get_key(key: str = Query(...)):
@@ -68,16 +70,12 @@ def validate_token(token: str = Query(...)):
         raise HTTPException(status_code=403, detail="Invalid or expired token")
 @app.get("/")
 async def serve_frontend(key: str = Depends(get_key), _: None = Depends(verify_referer)):
-    return FileResponse("frontend/dist/index.html")
+    token = create_access_token(data={"sub": "frontend_user", "date": datetime.now().strftime("%Y-%m-%d")})
+    return FileResponse("frontend/dist/index.html", headers={"X-Token": token})
 
-@app.get("/token")
-async def get_token(key: str = Depends(get_key), _: None = Depends(verify_referer)):
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = create_access_token(data={"sub": "frontend_user"}, expires_delta=access_token_expires)
-    return {"token": token}
 
 @app.post("/chat")
-async def chat_with_agent(request: MessageRequest, token: str = Depends(validate_token), _: None = Depends(verify_referer)):
+async def chat_with_agent(request: MessageRequest, token: str = Depends(validate_token)):
     config = {"configurable": {
         "park": request.park,
         "employmentType": request.employmentType,

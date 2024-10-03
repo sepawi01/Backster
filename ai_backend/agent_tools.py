@@ -9,6 +9,7 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import AzureOpenAIEmbeddings
 
+
 embeddings_model = AzureOpenAIEmbeddings(
     model="text-embedding-ada-002",
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -40,7 +41,7 @@ def hybrid_search(query: str, park: str, annual_employee: bool, seasonal_employe
         search_text=query,
         vector_queries=[content_vector_query],
         select=["title", "content", "park", "source", "id", "original_content", "message_id"],
-        top=4,
+        top=3,
         filter=combined_filter
     )
     results = list(results)
