@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.requests import Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
@@ -37,6 +38,17 @@ class MessageRequest(BaseModel):
     park: str
     employmentType: str
 
+
+def verify_referer(request: Request):
+    # Debugging
+    if True:
+        return
+    referer = request.headers.get('referer')
+    allowed_referer = "https://backstage.prs.se"
+
+    if not referer or not referer.startswith(allowed_referer):
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
 def get_key(key: str = Query(...)):
     if key != KEY:
         raise HTTPException(status_code=403, detail="Not authenticated")
@@ -59,17 +71,17 @@ def validate_token(token: str = Query(...)):
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
 @app.get("/")
-async def serve_frontend(key: str = Depends(get_key)):
+async def serve_frontend(key: str = Depends(get_key), _: None = Depends(verify_referer)):
     return FileResponse("frontend/dist/index.html")
 
 @app.get("/token")
-async def get_token(key: str = Depends(get_key)):
+async def get_token(key: str = Depends(get_key), _: None = Depends(verify_referer)):
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(data={"sub": "frontend_user"}, expires_delta=access_token_expires)
     return {"token": token}
 
 @app.post("/chat")
-async def chat_with_agent(request: MessageRequest, token: str = Depends(validate_token)):
+async def chat_with_agent(request: MessageRequest, token: str = Depends(validate_token), _: None = Depends(verify_referer)):
     config = {"configurable": {
         "park": request.park,
         "employmentType": request.employmentType,
