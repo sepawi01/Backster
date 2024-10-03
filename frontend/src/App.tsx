@@ -25,7 +25,6 @@ function App() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
-    const key = queryParams.get('key');
     const parkParam = queryParams.get('park') || 'glt';
     const parkMap: Record<string, string> = {
         'glt': 'Gröna Lund',
@@ -43,6 +42,21 @@ function App() {
     const parkStyle = parkStyles[parkParam];
 
     useEffect(() => {
+        // Set token from meta tag
+       const metaTag = document.querySelector('meta[name="x-token"]');
+    if (metaTag) {
+        const meta_token = metaTag.getAttribute('content');
+        if (meta_token) {
+            setToken(meta_token);
+        } else {
+            console.error('Token attribute is missing');
+        }
+    } else {
+        console.error('Meta tag not found');
+    }
+}, []);
+
+    useEffect(() => {
         // Scrolla till botten när nya meddelanden läggs till
         if (endOfMessagesRef.current) {
             endOfMessagesRef.current.scrollIntoView({behavior: "smooth"});
@@ -54,27 +68,7 @@ function App() {
         adjustTextAreaHeight();
     }, [inputValue]);
 
-    useEffect(() => {
 
-        const fetchToken = async () => {
-                    try {
-            const response = await fetch(`/?key=${key}`);
-            if (!response.ok) {
-                console.error("Failed to fetch root:", response.statusText);
-                return;
-            }
-            const tokenFromHeader = response.headers.get('X-Token');
-            if (tokenFromHeader) {
-                setToken(tokenFromHeader);
-            } else {
-                console.error("Token not found in header");
-            }
-        } catch (error) {
-            console.error("Error while getting token", error);
-        }
-    };
-        fetchToken();
-    }, []);
     const adjustTextAreaHeight = () => {
         const textarea = textareaRef.current;
         if (textarea) {

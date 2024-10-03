@@ -5,6 +5,7 @@ from fastapi.requests import Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import os
 import logging
 from jose import JWTError, jwt
@@ -31,6 +32,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
 app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
+templates = Jinja2Templates(directory="frontend/dist")
 
 class MessageRequest(BaseModel):
     session_id: str
@@ -69,9 +71,9 @@ def validate_token(token: str = Query(...)):
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
 @app.get("/")
-async def serve_frontend(key: str = Depends(get_key), _: None = Depends(verify_referer)):
+async def serve_frontend(request: Request, key: str = Depends(get_key), _: None = Depends(verify_referer)):
     token = create_access_token(data={"sub": "frontend_user", "date": datetime.now().strftime("%Y-%m-%d")})
-    return FileResponse("frontend/dist/index.html", headers={"X-Token": token})
+    return templates.TemplateResponse("index.html", {"request": request, "token": token})
 
 
 @app.post("/chat")
