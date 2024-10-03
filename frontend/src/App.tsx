@@ -4,6 +4,7 @@ import {useLocation} from 'react-router-dom';
 import {BeatLoader} from 'react-spinners';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import SourcesModal from "./components/SourceModal.tsx";
 
 function App() {
     const [inputValue, setInputValue] = useState("");
@@ -20,8 +21,9 @@ function App() {
     const [isTyping, setIsTyping] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
-    const [_, setContents] = useState<string[]>([]);
+    const [contents, setContents] = useState<string[]>([]);
     const [sources, setSources] = useState<string[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const location = useLocation();
     const queryParams = new URLSearchParams(location.search);
     const key = queryParams.get('key');
@@ -156,16 +158,8 @@ function App() {
                                     {message.text}
                                 </ReactMarkdown>
                                 {message.fromBot && index > 2 && <hr className="my-4 border-t border-gray-300" />}
-                                {message.fromBot  && sources.length > 0 && index > 2 && sources.map((source, index) => {
-                                    return (
-                                        <div key={index}>
-                                            <p className="text-xs">{source}</p>
-                                        </div>
-                                    )
-
-                                })
-                                }
                                 {message.fromBot && index > 2 && <p className="text-xs text-gray-500">Ai-genererat.</p>}
+                                {message.fromBot  && sources.length > 0 && index > 2 && <a onClick={() => setIsModalOpen(true)}>Visa källor</a>}
 
                             </div>
                         </div>
@@ -226,6 +220,14 @@ function App() {
                     />
                 </div>
             </div>
+
+            {/* Sources Modal */}
+            <SourcesModal
+                sources={sources}
+                contents={contents}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
         </div>
     );
 }

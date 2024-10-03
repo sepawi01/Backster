@@ -88,11 +88,16 @@ async def chat_with_agent(request: MessageRequest, token: str = Depends(validate
         "thread_id": request.session_id
     }}
     state = {"messages": [("user", request.query)]}
-
+    sources = []
+    original_contents = []
     response = agent.graph.invoke(state, config)
     answer = response['messages'][-1].content
-    state = response.get('state', {})
-    sources = state.get('sources', [])
-    contents = state.get('original_contents', [])
 
-    return {'fromBot': True, "text": answer, "sources": sources, "contents": contents}
+    for message in response['messages']:
+        if message.name == "lookup_faq":
+            artifact = message.artifact
+            sources = artifact.get('sources', [])
+            original_contents = artifact.get('original_contents', [])
+
+
+    return {'fromBot': True, "text": answer, "sources": set(sources), "contents": set(original_contents)}

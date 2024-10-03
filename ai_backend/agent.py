@@ -49,12 +49,9 @@ class Assistant:
             if not result.tool_calls and not result.content:
                 state["messages"].append(("user", "Respond with a real output."))
             else:
-                if isinstance(result.content, dict) and 'sources' in result.content:
-                    state['sources'] = result.content['sources']
-                    state['original_contents'] = result.content['original_contents']
                 break
 
-        return {"messages": result, "state": state}
+        return {"messages": result}
 
 
 def create_primary_prompt():
@@ -68,7 +65,7 @@ def create_primary_prompt():
         att hjälpa medarbetaren. Svara detaljerat och steg-för-steg, och inkludera alla relevanta instruktioner eller
         detaljer som du har tillgång till i kontexten. Om frågan inte uppenbart är en get_daily_park_data eller 
         handle_resignation-fråga, så använd ALLTID lookup_faq för att se om det finns en matchande fråga i kunskaps-
-        databasen. Säkerställ ocskå att query till lookup_faq är så semantiskt korrekt som möjligt utifrån de personen
+        databasen. Säkerställ också att query till lookup_faq är så semantiskt korrekt som möjligt utifrån de personen
         frågar. Om du inte kan hitta ett svar med hjälp av information från verktygen, så uppge det tydligt för 
         användaren och föreslå vänligt att personen kan kontakta Artistservice för hjälp med frågan.
         

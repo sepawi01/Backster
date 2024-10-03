@@ -82,11 +82,25 @@ def _print_event(event: dict, _printed: set, max_length=1500):
             _printed.add(message.id)
 
 
-@tool
-def lookup_faq(query: str, park: str, employment_type: Literal['Tillsvidare', 'Säsong/Visstid']) -> str:
-    """Searches the companys internal knowledge base to find answers for users questions.
-    Always use this tool before answering a users question. It will give you the most relevant information you
-    have access to in regard to the employees question."""
+@tool(response_format="content_and_artifact")
+def lookup_faq(query: str, park: str, employment_type: Literal['Tillsvidare', 'Säsong/Visstid']):
+    """
+    Searches the company's internal knowledge base to find answers for user questions.
+    This tool should always be used before answering a user's question as it provides the
+    most relevant information regarding the employee's query.
+
+    Args:
+        query (str): The question or query provided by the user.
+        park (str): The name of the park for context. Must match the park data in the knowledge base.
+        employment_type (Literal): The type of employment, either 'Tillsvidare' or 'Säsong/Visstid'.
+
+    Returns:
+        tuple: A tuple containing:
+            - context (str): The relevant information found in the knowledge base.
+            - dict: A dictionary with additional information:
+                - sources (list[str]): A list of source paths used in the context.
+                - original_contents (list[str]): A list of original content pieces retrieved during the search.
+    """
     rag_results = hybrid_search(query,
                                 park,
                                 annual_employee=employment_type == "Tillsvidare",
@@ -95,23 +109,24 @@ def lookup_faq(query: str, park: str, employment_type: Literal['Tillsvidare', 'S
     sources = [result["source"] for result in rag_results]
     original_contents = [content["original_content"] for content in rag_results]
     context = "\n".join([content["content"] for content in rag_results])
-    return {"context": context, "sources": sources, "original_contents": original_contents}
+    return context, {"sources": sources, "original_contents": original_contents}
 
 
 @tool
 def get_daily_park_data(park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"], date: str) -> dict:
-    """Fetches daily information for a specific date regarding the parks.
+    """
+    Fetches daily information for a specific date regarding the parks.
 
-    Use this if the user asks for information regarding the opening hours for the park
-    or questions about expected, budgeted or actual number of guests on a specific date.
+    This tool should be used if the user asks for information related to the park's opening hours
+    or questions about expected, budgeted, or actual number of guests on a specific date.
 
     Args:
         park (Literal): The name of the park. Must be one of "Gröna Lund", "Furuvik", "Kolmården", or "Skara Sommarland".
         date (str): The date for which the information is requested, formatted as YYYY-MM-DD.
 
     Returns:
-        dict: A dictionary containing the park's daily information.
-        If the park name is invalid or data retrieval fails, returns a dictionary with an "error" key.
+        dict: A dictionary containing the park's daily information. If the park name is invalid or
+        data retrieval fails, the dictionary will contain an "error" key with an appropriate message.
     """
     park_map = {
         "Gröna Lund": '03',
@@ -137,11 +152,20 @@ def get_daily_park_data(park: Literal["Gröna Lund", "Furuvik", "Kolmården", "S
 @tool
 def handle_resignation(employee_name: str = None, resignation_date: str = None, reason: str = None):
     """
-    Hanterar uppsägningsprocessen för en anställd.
-    Frågar efter fullständigt namn, uppsägningsdatum, och genomför en kort intervju för orsaken.
-    När all information är samlad, skrivs den ut (för nu) i konsolen.
-    """
+    Handles the resignation process for an employee by asking for the full name,
+    resignation date, and conducting a short interview for the reason.
 
+    When all information is collected, it is printed to the console (as a placeholder for further processing).
+
+    Args:
+        employee_name (str, optional): The full name of the employee. If not provided, the function will prompt for it.
+        resignation_date (str, optional): The date on which the resignation should take effect. If not provided, the function will prompt for it.
+        reason (str, optional): The reason for resignation. If not provided, the function will prompt for it.
+
+    Returns:
+        str: A message confirming the resignation registration if all necessary information is provided,
+        or a prompt for the missing information.
+    """
     if not employee_name:
         return "Vad är ditt fullständiga namn?"
 
@@ -154,5 +178,5 @@ def handle_resignation(employee_name: str = None, resignation_date: str = None, 
     print(f"Anställd: {employee_name} vill säga upp sig från och med {resignation_date}.")
     print(f"Anledning till uppsägningen: {reason}")
 
-    # Returnera ett bekräftelsemeddelande
+    # Return a confirmation message
     return "Din uppsägning har registrerats. Tack för att du delade denna information."
