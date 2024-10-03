@@ -10,7 +10,6 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 load_dotenv()
 
-from ai_backend.agent_tools import hybrid_search
 from ai_backend import agent
 
 app = FastAPI()
@@ -40,9 +39,6 @@ class MessageRequest(BaseModel):
 
 
 def verify_referer(request: Request):
-    # Debugging
-    if True:
-        return
     referer = request.headers.get('referer')
     allowed_referer = "https://backstage.prs.se"
 
