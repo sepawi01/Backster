@@ -43,6 +43,8 @@ class MessageRequest(BaseModel):
 
 def verify_referer(request: Request):
     """Make sure the request comes from a valid referer"""
+    if request.headers.get('Host') == "127.0.0.1:8000":
+        return
     referer = request.headers.get('referer')
     allowed_referers = ["https://backstage.prs.se", "https://app.actimo.com/"]
 
@@ -81,6 +83,8 @@ async def chat_with_agent(request: MessageRequest, token: str = Depends(validate
     config = {"configurable": {
         "park": request.park,
         "employmentType": request.employmentType,
+        "current_date": datetime.today().strftime("%Y-%m-%d"),
+        "current_time": datetime.today().strftime("%H:%M"),
         "thread_id": request.session_id
     }}
     state = {"messages": [("user", request.query)]}

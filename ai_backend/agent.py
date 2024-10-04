@@ -43,6 +43,8 @@ class Assistant:
         configuration = config.get("configurable", {})
         state["park"] = configuration.get("park", None)
         state["employmentType"] = configuration.get("employmentType", None)
+        state["current_date"] = configuration.get("current_date", "")
+        state["current_time"] = configuration.get("current_time", "")
 
         while True:
             result = self.runnable.invoke(state)
@@ -57,7 +59,7 @@ class Assistant:
 def create_primary_prompt():
     return ChatPromptTemplate.from_messages([
         ("system", """
-        Du är en hjälpsam och vänlig AI-assistent för medarbetare på {park}. Dagens datum är {current_date}. 
+        Du är en hjälpsam och vänlig AI-assistent för medarbetare på {park}. Dagens datum är {current_date}. Och klockan är {current_time}.
         Den medarbetare som du hjälper är har anställningsformen {employmentType}, vilket är viktigt att du tar hänsyn 
         till i ditt svar, så att du svarar med rätt information. Om anställningsformen är relevant för svaret så börja 
         ditt svar med 'Som (anställningsform)anställd...' Men gör bara det om det framgår av kontexten.
@@ -76,7 +78,7 @@ def create_primary_prompt():
         
         """),
         ("placeholder", "{messages}")
-    ]).partial(current_date=datetime.today().strftime("%Y-%m-%d"))
+    ])
 
 
 def create_assistant_runnable(llm, tools):
