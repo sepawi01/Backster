@@ -10,7 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 from dotenv import load_dotenv
-from ai_backend.agent_tools import lookup_faq, get_daily_park_data, handle_resignation
+from ai_backend.agent_tools import lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass
 
 load_dotenv()
 
@@ -45,6 +45,7 @@ class Assistant:
         state["employmentType"] = configuration.get("employmentType", None)
         state["current_date"] = configuration.get("current_date", "")
         state["current_time"] = configuration.get("current_time", "")
+        state["tools"] = ", ".join(["lookup_faq", "get_daily_park_data", "handle_resignation", "handle_lost_backstagepass"])
 
         while True:
             result = self.runnable.invoke(state)
@@ -63,11 +64,10 @@ def create_primary_prompt():
         Den medarbetare som du hjälper är har anställningsformen {employmentType}, vilket är viktigt att du tar hänsyn 
         till i ditt svar, så att du svarar med rätt information. Om anställningsformen är relevant för svaret så börja 
         ditt svar med 'Som (anställningsform)anställd...' Men gör bara det om det framgår av kontexten.
-        Använd de verktyg som du har tillgång till, så som handle_resignation, lookup_fag och get_daily_park_data för 
+        Använd de verktyg som du har tillgång till, så som {tools} för 
         att hjälpa medarbetaren. Svara detaljerat och steg-för-steg, och inkludera alla relevanta instruktioner eller
-        detaljer som du har tillgång till i kontexten. Om frågan inte uppenbart är en get_daily_park_data eller 
-        handle_resignation-fråga, så använd ALLTID lookup_faq för att se om det finns en matchande fråga i kunskaps-
-        databasen. Säkerställ också att query till lookup_faq är så semantiskt korrekt som möjligt utifrån de personen
+        detaljer som du har tillgång till i kontexten. Var noga med att använda lookup_faq för att söka efter svar på 
+        medarbetarens frågor. Säkerställ också att query till lookup_faq är så semantiskt korrekt som möjligt utifrån de personen
         frågar. Om du inte kan hitta ett svar med hjälp av information från verktygen, så uppge det tydligt för 
         användaren och föreslå vänligt att personen kan kontakta Artistservice för hjälp med frågan.
         
@@ -86,7 +86,7 @@ def create_assistant_runnable(llm, tools):
     return primary_prompt | llm.bind_tools(tools)
 
 
-tools = [lookup_faq, get_daily_park_data, handle_resignation]
+tools = [lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass]
 assistant_runnable = create_assistant_runnable(llm, tools)
 
 builder = StateGraph(State)

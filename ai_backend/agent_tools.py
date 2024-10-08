@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 from typing import Literal
 
 import httpx
@@ -8,6 +9,8 @@ from azure.search.documents._generated.models import VectorizedQuery
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import AzureOpenAIEmbeddings
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
 embeddings_model = AzureOpenAIEmbeddings(
@@ -66,21 +69,6 @@ def handle_tool_error(state) -> dict:
 #     return ToolNode(tools).with_fallbacks(
 #         [RunnableLambda(handle_tool_error)], exception_key="error"
 #     )
-
-def _print_event(event: dict, _printed: set, max_length=1500):
-    current_state = event.get("dialog_state")
-    if current_state:
-        print("Currently in: ", current_state[-1])
-    message = event.get("messages")
-    if message:
-        if isinstance(message, list):
-            message = message[-1]
-        if message.id not in _printed:
-            msg_repr = message.pretty_repr(html=True)
-            if len(msg_repr) > max_length:
-                msg_repr = msg_repr[:max_length] + " ... (truncated)"
-            print(msg_repr)
-            _printed.add(message.id)
 
 
 @tool(response_format="content_and_artifact")
@@ -151,17 +139,18 @@ def get_daily_park_data(park: Literal["Gröna Lund", "Furuvik", "Kolmården", "S
 
 
 @tool
-def handle_resignation(employee_name: str = None, resignation_date: str = None, reason: str = None):
+def handle_resignation(employee_name: str = None, email_adress: str = None, resignation_date: str = None, reason: str = ""):
     """
-    Handles the resignation process for an employee by asking for the full name,
-    resignation date, and conducting a short interview for the reason.
-
-    When all information is collected, it is printed to the console (as a placeholder for further processing).
+    Handles the resignation process for an employee by asking for the full name, resignation date, email adress and reason.
+    When the employee is asking for resignation, it's important to inform the employee that it has a minimum notice period
+    of 14 days.
 
     Args:
-        employee_name (str, optional): The full name of the employee. If not provided, the function will prompt for it.
-        resignation_date (str, optional): The date on which the resignation should take effect. If not provided, the function will prompt for it.
-        reason (str, optional): The reason for resignation. If not provided, the function will prompt for it.
+        employee_name (str): The full name of the employee. If not provided, the function will prompt for it.
+        email_adress (str): The email address of the employee. If not provided, the function will prompt for it.
+        resignation_date (str): The date on which the resignation should take effect, format = %Y-%m-%d. If not provided, the function will prompt for it.
+        reason (str, optional): The reason for resignation. If not provided, the function will prompt for it but accept a no.
+
 
     Returns:
         str: A message confirming the resignation registration if all necessary information is provided,
@@ -170,14 +159,101 @@ def handle_resignation(employee_name: str = None, resignation_date: str = None, 
     if not employee_name:
         return "Vad är ditt fullständiga namn?"
 
+    if not email_adress:
+        return "Vad är din mailadress?"
+
     if not resignation_date:
         return "Vilket datum vill du att uppsägningen ska gälla från?"
 
     if not reason:
-        return "Kan du kort förklara varför du vill säga upp dig?"
+        return "Vill du berätta varför du väljer att säga upp dig? Om du inte vill dela detta kan du svara med 'nej'."
 
-    print(f"Anställd: {employee_name} vill säga upp sig från och med {resignation_date}.")
-    print(f"Anledning till uppsägningen: {reason}")
+    try:
+        resignation_date = datetime.strptime(resignation_date, "%Y-%m-%d")
+    except ValueError:
+        return "Datumet måste vara i formatet YYYY-MM-DD."
 
-    # Return a confirmation message
-    return "Din uppsägning har registrerats. Tack för att du delade denna information."
+    if resignation_date < datetime.now() + timedelta(days=14):
+        return "Uppsägningen kan inte göras tidigare än 14 dagar från idag."
+
+    message = Mail(
+        from_email="backster@parksandresorts.com",
+        to_emails=os.getenv("SEND_TO_EMAIL"),
+        subject=f"Backster: Uppsägning från {employee_name}",
+        html_content=f"""
+        <body>
+        <div class="email-container">
+            <h1>Backster: Uppsägning</h1>
+            <p>Hej!</p>
+            <p>{employee_name} har efterfrågat att säga upp sig från sin anställning. {employee_name} önskar att 
+            uppsägningen ska gälla från {resignation_date}.</p>
+            <p>Anledning till uppsägningen: {reason}</p>
+            <p>Om ni vill kontakta {employee_name} så har hen uppgett följande mailadress:</p>
+            <p>{email_adress}</p>
+            <div class="footer">
+                <p>Med vänliga hälsningar, Backster</p>
+            </div>
+        </div>
+    </body>""")
+
+    try:
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sg.send(message)
+
+        if response.status_code != 202:
+            raise Exception("Failed to send email")
+    except Exception as e:
+        return f"""Jag kunde tyvärr inte skicka informationen till Artistservice. Vänligen försök igen senare eller kontakta Artistservice direkt."""
+
+    return "Jag har nu skickat informationen till Artistservice. Dom kommer återkoppla till dig inom kort."
+
+
+@tool
+def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
+    """
+    Handles the situation when an employee has lost their Backstage pass.
+    The tool will guide the employee through the process of putting together the correct information to Artistservice.
+    The information will be used to send an email to Aristservice with the necessary information.
+
+    Args:
+        full_name (str): The full name of the employee.
+        email_address (str): The email address of the employee.
+
+    Returns:
+        str: A message informing if the message was sent successfully or not.
+    """
+    if not full_name:
+        return "För att skicka informationen till Artistservice behöver jag ditt fullständiga namn."
+    if not email_address:
+        return "För att skicka informationen till Artistservice behöver jag din mailadress."
+
+    message = Mail(
+        from_email="backster@parksandresorts.com",
+        to_emails=os.getenv("SEND_TO_EMAIL"),
+        subject=f"Backster: {full_name} önskar spärra sitt Backstagepass",
+        html_content=f"""
+        <body>
+        <div class="email-container">
+            <h1>Backster: Spärr av Backstagepass</h1>
+            <p>Hej!</p>
+            <p>{full_name} har tappat sitt Backstagepass och önskar att spärra det. Jag har informerat {full_name} att komma till Artistservice för att få ett nytt pass.
+             Om ni vill kontakta {full_name} så har hen uppgett följande mailadress:</p>
+            <p>{email_address}</p>
+            <div class="footer">
+                <p>Med vänliga hälsningar, Backster</p>
+            </div>
+        </div>
+    </body>""")
+
+    try:
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sg.send(message)
+
+        if response.status_code != 202:
+            raise Exception("Failed to send email")
+
+    except Exception as e:
+        return f"""Jag kunde tyvärr inte skicka informationen till Artistservice. 
+        Försök igen senare eller kontakta Aristservice direkt."""
+
+    return f"""Jag har nu skickat informationen till Artistservice. Kom in till Artistservice för att hämta ett nytt Backstagepass."""
