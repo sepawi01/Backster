@@ -12,7 +12,6 @@ from langchain_openai import AzureOpenAIEmbeddings
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
-
 embeddings_model = AzureOpenAIEmbeddings(
     model="text-embedding-ada-002",
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -139,7 +138,8 @@ def get_daily_park_data(park: Literal["Gröna Lund", "Furuvik", "Kolmården", "S
 
 
 @tool
-def handle_resignation(employee_name: str = None, email_adress: str = None, resignation_date: str = None, reason: str = ""):
+def handle_resignation(employee_name: str = None, email_adress: str = None, resignation_date: str = None,
+                       reason: str = None):
     """
     Handles the resignation process for an employee by asking for the full name, resignation date, email adress and reason.
     When the employee is asking for resignation, it's important to inform the employee that it has a minimum notice period
@@ -149,8 +149,7 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
         employee_name (str): The full name of the employee. If not provided, the function will prompt for it.
         email_adress (str): The email address of the employee. If not provided, the function will prompt for it.
         resignation_date (str): The date on which the resignation should take effect, format = %Y-%m-%d. If not provided, the function will prompt for it.
-        reason (str, optional): The reason for resignation. If not provided, the function will prompt for it but accept a no.
-
+        reason (str): The reason for resignation. If not provided, the function will prompt for it.
 
     Returns:
         str: A message confirming the resignation registration if all necessary information is provided,
@@ -166,14 +165,14 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
         return "Vilket datum vill du att uppsägningen ska gälla från?"
 
     if not reason:
-        return "Vill du berätta varför du väljer att säga upp dig? Om du inte vill dela detta kan du svara med 'nej'."
+        return "Vad är anledningen till att du vill säga upp dig?"
 
     try:
         resignation_date = datetime.strptime(resignation_date, "%Y-%m-%d")
     except ValueError:
         return "Datumet måste vara i formatet YYYY-MM-DD."
 
-    if resignation_date < datetime.now() + timedelta(days=14):
+    if resignation_date <= datetime.now() + timedelta(days=14):
         return "Uppsägningen kan inte göras tidigare än 14 dagar från idag."
 
     message = Mail(
@@ -181,20 +180,17 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
         to_emails=os.getenv("SEND_TO_EMAIL"),
         subject=f"Backster: Uppsägning från {employee_name}",
         html_content=f"""
-        <body>
-        <div class="email-container">
-            <h1>Backster: Uppsägning</h1>
-            <p>Hej!</p>
-            <p>{employee_name} har efterfrågat att säga upp sig från sin anställning. {employee_name} önskar att 
-            uppsägningen ska gälla från {resignation_date}.</p>
-            <p>Anledning till uppsägningen: {reason}</p>
-            <p>Om ni vill kontakta {employee_name} så har hen uppgett följande mailadress:</p>
-            <p>{email_adress}</p>
-            <div class="footer">
-                <p>Med vänliga hälsningar, Backster</p>
-            </div>
-        </div>
-    </body>""")
+
+        <h1>Backster: Uppsägning av anställning</h1>
+        <p>Hej!</p>
+        <p>Jag har mottagit en anmälan om uppsägning från <span class="highlight">{employee_name}</span> med kontaktuppgifter: 
+        <span class="highlight">{email_adress}</span>.</p>
+        <p>{employee_name} önskar att säga upp sig och har angett att sista arbetsdagen ska vara <span class="highlight">{resignation_date.strftime("%Y-%m-%d")}</span>.</p>
+        <p>Angiven anledning till uppsägningen är: <span class="highlight">{reason}</span>.</p>
+        <p>Vänligen kontakta {employee_name} för ytterligare frågor eller för att bekräfta uppsägningen.</p>
+        <p>Med vänliga hälsningar,</p>
+        <p>Backster</p>
+        """)
 
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
