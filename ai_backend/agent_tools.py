@@ -21,6 +21,12 @@ embeddings_model = AzureOpenAIEmbeddings(
 search_client = SearchClient(os.getenv("AZURE_AI_SEARCH_ENDPOINT"), "backster-first",
                              AzureKeyCredential(os.getenv("AZURE_AI_SEARCH_API_KEY")))
 
+artistservice_mail_park_map = {
+        "Gröna Lund": 'artistservice@gronalund.com',
+        "Furuvik": 'artistservice@furuvik.com',
+        "Kolmården": 'artistservice@kolmarden.com',
+        "Skara Sommarland": 'artistservice@sommarland.se'
+    }
 
 def hybrid_search(query: str, park: str, annual_employee: bool, seasonal_employee: bool):
     embedded_query = embeddings_model.embed_query(query)
@@ -62,12 +68,6 @@ def handle_tool_error(state) -> dict:
             for tc in tool_calls
         ]
     }
-
-
-# def create_tool_node_with_fallback(tools: list) -> dict:
-#     return ToolNode(tools).with_fallbacks(
-#         [RunnableLambda(handle_tool_error)], exception_key="error"
-#     )
 
 
 @tool(response_format="content_and_artifact")
@@ -138,23 +138,27 @@ def get_daily_park_data(park: Literal["Gröna Lund", "Furuvik", "Kolmården", "S
 
 
 @tool
-def handle_resignation(employee_name: str = None, email_adress: str = None, resignation_date: str = None,
-                       reason: str = None):
+def handle_resignation(employee_name: str, email_adress: str, resignation_date: str,
+                       reason: str, park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"]):
     """
-    Handles the resignation process for an employee by asking for the full name, resignation date, email adress and reason.
-    When the employee is asking for resignation, it's important to inform the employee that it has a minimum notice period
-    of 14 days.
+    Handles the resignation process for a Gröna Lund employee by asking for the full name, resignation date, email adress and reason.
+    When the employee is asking for resignation, inform the employee that it has a minimum notice period
+    of 14 days. There is only Gröna Lund employees that can use this tool.
 
     Args:
         employee_name (str): The full name of the employee. If not provided, the function will prompt for it.
         email_adress (str): The email address of the employee. If not provided, the function will prompt for it.
         resignation_date (str): The date on which the resignation should take effect, format = %Y-%m-%d. If not provided, the function will prompt for it.
         reason (str): The reason for resignation. If not provided, the function will prompt for it.
+        park (Literal): The name of the park where the employee works. Must be one of "Gröna Lund", "Furuvik", "Kolmården", or "Skara Sommarland".
 
     Returns:
-        str: A message confirming the resignation registration if all necessary information is provided,
-        or a prompt for the missing information.
+        str: A message informing if the message was sent successfully or not.
     """
+
+    if park != "Gröna Lund":
+        return "Tyvärr kan jag inte hjälpa dig med uppsägning. Vänligen kontakta Artistservice."
+
     if not employee_name:
         return "Vad är ditt fullständiga namn?"
 
@@ -175,8 +179,9 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
     if resignation_date <= datetime.now() + timedelta(days=14):
         return "Uppsägningen kan inte göras tidigare än 14 dagar från idag."
 
+
     message = Mail(
-        from_email="backster@parksandresorts.com",
+        from_email=os.getenv("SEND_FROM_EMAIL"),
         to_emails=os.getenv("SEND_TO_EMAIL"),
         subject=f"Backster: Uppsägning från {employee_name}",
         html_content=f"""
@@ -190,6 +195,7 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
         <p>Vänligen kontakta {employee_name} för ytterligare frågor eller för att bekräfta uppsägningen.</p>
         <p>Med vänliga hälsningar,</p>
         <p>Backster</p>
+        <p>TEST RAD! Jag kommer skicka till {artistservice_mail_park_map.get(park, "error")} när vi går live</p>
         """)
 
     try:
@@ -205,15 +211,16 @@ def handle_resignation(employee_name: str = None, email_adress: str = None, resi
 
 
 @tool
-def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
+def handle_lost_backstagepass(full_name: str, email_address: str,
+                              park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"]):
     """
     Handles the situation when an employee has lost their Backstage pass.
     The tool will guide the employee through the process of putting together the correct information to Artistservice.
-    The information will be used to send an email to Aristservice with the necessary information.
 
     Args:
         full_name (str): The full name of the employee.
         email_address (str): The email address of the employee.
+        park (Literal): The name of the park where the employee works. Must be one of "Gröna Lund", "Furuvik", "Kolmården", or "Skara Sommarland".
 
     Returns:
         str: A message informing if the message was sent successfully or not.
@@ -224,23 +231,20 @@ def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
         return "För att skicka informationen till Artistservice behöver jag din mailadress."
 
     message = Mail(
-        from_email="backster@parksandresorts.com",
+        from_email=os.getenv("SEND_FROM_EMAIL"),
         to_emails=os.getenv("SEND_TO_EMAIL"),
         subject=f"Backster: {full_name} önskar spärra sitt Backstagepass",
         html_content=f"""
-        <body>
-        <div class="email-container">
             <h1>Backster: Spärr av Backstagepass</h1>
             <p>Hej!</p>
             <p>{full_name} har tappat sitt Backstagepass och önskar att spärra det. Jag har informerat {full_name} att 
             komma till Artistservice för att få ett nytt pass.
              Om ni vill kontakta {full_name} så har hen uppgett följande mailadress:</p>
             <p>{email_address}</p>
-            <div class="footer">
-                <p>Med vänliga hälsningar, Backster</p>
-            </div>
-        </div>
-    </body>""")
+            <p>Med vänliga hälsningar, Backster</p>
+            
+            <p>TEST RAD! Jag kommer skicka till {artistservice_mail_park_map.get(park, "error")} när vi går live</p>
+            """)
 
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
@@ -259,16 +263,17 @@ def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
 @tool
 def handle_work_certificate_request(certificate_type: Literal['arbetsintyg', 'arbetsbetyg'],
                                     full_name: str,
-                                    email_address: str):
+                                    email_address: str,
+                                    park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"]):
     """
     Handles the situation when an employee requests a work certificate.
     The tool will guide the employee through the process of putting together the correct information to Artistservice.
-    The information will be used to send an email to Artistservice with the necessary information.
 
     Args:
         certificate_type (Literal): The type of certificate requested, either 'arbetsintyg' or 'arbetsbetyg'.
         full_name (str): The full name of the employee.
         email_address (str): The email address of the employee.
+        park (Literal): The name of the park where the employee works. Must be one of "Gröna Lund", "Furuvik", "Kolmården", or "Skara Sommarland".
 
     Returns:
         str: A message informing if the message was sent successfully or not.
@@ -282,7 +287,7 @@ def handle_work_certificate_request(certificate_type: Literal['arbetsintyg', 'ar
         return "Vänligen ange vilken typ av intyg du önskar, antingen 'arbetsintyg' eller 'arbetsbetyg'."
 
     message = Mail(
-        from_email="backster@parksandresorts.com",
+        from_email=os.getenv("SEND_FROM_EMAIL"),
         to_emails=os.getenv("SEND_TO_EMAIL"),
         subject=f"Backster: Begäran om {certificate_type}",
         html_content=
@@ -291,9 +296,9 @@ def handle_work_certificate_request(certificate_type: Literal['arbetsintyg', 'ar
         <p>Hej!</p>
         <p><span class="highlight">{full_name}</span> önskar att få ett <span class="highlight">{certificate_type}</span> vid avslutad säsong.</p>
         <p>Personens mail-adress är: <span class="highlight">{email_address}</span>.</p>
-            <p>Med vänliga hälsningar,</p>
-            <p>Backster Support</p>
+            <p>Med vänliga hälsningar, Backster</p>
 
+    <p>TEST RAD! Jag kommer skicka till {artistservice_mail_park_map.get(park, "error")} när vi går live</p>
     """)
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
@@ -310,12 +315,15 @@ def handle_work_certificate_request(certificate_type: Literal['arbetsintyg', 'ar
 
 
 @tool
-def handle_give_away_shift(full_name: str, email_address: str, shift_date: str, shift_receiver_full_name: str,
-                           shift_receiver_email: str):
+def handle_give_away_shift(full_name: str, email_address: str,
+                           shift_date: str,
+                           shift_receiver_full_name: str,
+                           shift_receiver_email: str,
+                           park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"]):
     """
     Handles the situation when an employee wants to give away a shift to another employee.
     The tool will guide the employee through the process of putting together the correct information to Artistservice.
-    The information will be used to send an email to the employee that should take the shift, with the necessary information.
+    The information will be used to send an email to the employee that should take the shift.
 
     Args:
         full_name (str): The full name of the employee that want to give away shift.
@@ -340,17 +348,17 @@ def handle_give_away_shift(full_name: str, email_address: str, shift_date: str, 
         return "För att skicka informationen till mottagaren behöver jag mottagarens mailadress."
 
     message = Mail(
-        from_email="backster@parksandresorts.com",
+        from_email=os.getenv("SEND_FROM_EMAIL"),
         to_emails=shift_receiver_email,
         subject=f"Backster: {full_name} önskar ge bort ett pass",
         html_content=f"""
     <h1>Övertagande av arbetspass</h1>
     <p>Hej <span class="highlight">{shift_receiver_full_name}</span>!</p>
     <p>Din kollega <span class="highlight">{full_name}</span> har ett pass den <span class="highlight">{shift_date}</span> som hen önskar att du tar över.</p>
-    <p>För att bekräfta övertagandet, vänligen vidarebefordra detta e-postmeddelande till <span class="highlight">artistservice@parksandresorts.com</span>.</p>
+    <p>För att bekräfta övertagandet, vänligen vidarebefordra detta e-postmeddelande till <span class="highlight">{artistservice_mail_park_map.get(park, "error")}</span>.</p>
     <p>Om du har några frågor, tveka inte att kontakta Artistservice.</p>
     <p>Med vänliga hälsningar,</p>
-    <p>Backster Support</p>""")
+    <p>Backster</p>""")
 
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
@@ -366,7 +374,10 @@ def handle_give_away_shift(full_name: str, email_address: str, shift_date: str, 
 
 
 @tool
-def handle_illness_insurance(full_name: str, email_address: str, sick_leave_dates: list[str]):
+def handle_illness_insurance(full_name: str,
+                             email_address: str,
+                             sick_leave_dates: list[str],
+                             park: Literal["Gröna Lund", "Furuvik", "Kolmården", "Skara Sommarland"]):
     """
     Handles the situation when an employee want to register a illness insurance.
     The tool will guide the employee through the process of putting together the correct information to Artistservice.
@@ -376,10 +387,14 @@ def handle_illness_insurance(full_name: str, email_address: str, sick_leave_date
         full_name (str): The full name of the employee.
         email_address (str): The email address of the employee.
         sick_leave_dates (list[str]): The date or dates of the sick leave.
+        park (Literal): The name of the park where the employee works. Must be one of "Gröna Lund", "Furuvik", "Kolmården", or "Skara Sommarland".
 
     Returns:
         str: A message confirming if the message was sent successfully or not.
     """
+
+    if park != "Gröna Lund":
+        return "Tyvärr kan jag inte hjälpa dig med sjukdomsförsäkring."
 
     if not full_name:
         return "För att skicka informationen till Artistservice behöver jag ditt fullständiga namn."
@@ -391,11 +406,16 @@ def handle_illness_insurance(full_name: str, email_address: str, sick_leave_date
     sick_leave_dates = ", ".join(sick_leave_dates)
 
     message = Mail(
-        from_email="backster@parksandresorts.com",
+        from_email=os.getenv("SEND_FROM_EMAIL"),
         to_emails=os.getenv("SEND_TO_EMAIL"),
         subject=f"Backster: Sjukförsäkran från {full_name}",
-        html_content=f"""{full_name} har varit hemma sjuk under följande datum: {sick_leave_dates}. Och önskar
-        att registrera en sjukdomsförsäkran. Kontakta {full_name} på {email_address} för ytterligare information.""")
+        html_content=f"""<p>{full_name} har varit hemma sjuk under följande datum: {sick_leave_dates}. Och önskar
+        att registrera en sjukdomsförsäkran. Kontakta {full_name} på {email_address} för ytterligare information.
+        </p>
+        <p>Med vänliga hälsningar, Backster</p>
+        
+        <p>TEST RAD! Jag kommer skicka till {artistservice_mail_park_map.get(park, "error")} när vi går live</p>
+        """)
 
     try:
         sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
