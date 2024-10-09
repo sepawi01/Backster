@@ -10,7 +10,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 from dotenv import load_dotenv
-from ai_backend.agent_tools import lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass
+from ai_backend.agent_tools import (lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass,
+                                    handle_illness_insurance, handle_give_away_shift, handle_work_certificate_request)
 
 load_dotenv()
 
@@ -45,7 +46,9 @@ class Assistant:
         state["employmentType"] = configuration.get("employmentType", None)
         state["current_date"] = configuration.get("current_date", "")
         state["current_time"] = configuration.get("current_time", "")
-        state["tools"] = ", ".join(["lookup_faq", "get_daily_park_data", "handle_resignation", "handle_lost_backstagepass"])
+        state["tools"] = ", ".join(["lookup_faq", "get_daily_park_data", "handle_resignation",
+                                    "handle_lost_backstagepass", "handle_illness_insurance", "handle_give_away_shift",
+                                    "handle_work_certificate_request"])
 
         while True:
             result = self.runnable.invoke(state)
@@ -86,7 +89,8 @@ def create_assistant_runnable(llm, tools):
     return primary_prompt | llm.bind_tools(tools)
 
 
-tools = [lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass]
+tools = [lookup_faq, get_daily_park_data, handle_resignation, handle_lost_backstagepass, handle_illness_insurance,
+         handle_give_away_shift, handle_work_certificate_request]
 assistant_runnable = create_assistant_runnable(llm, tools)
 
 builder = StateGraph(State)

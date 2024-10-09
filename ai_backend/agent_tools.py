@@ -232,7 +232,8 @@ def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
         <div class="email-container">
             <h1>Backster: Spärr av Backstagepass</h1>
             <p>Hej!</p>
-            <p>{full_name} har tappat sitt Backstagepass och önskar att spärra det. Jag har informerat {full_name} att komma till Artistservice för att få ett nytt pass.
+            <p>{full_name} har tappat sitt Backstagepass och önskar att spärra det. Jag har informerat {full_name} att 
+            komma till Artistservice för att få ett nytt pass.
              Om ni vill kontakta {full_name} så har hen uppgett följande mailadress:</p>
             <p>{email_address}</p>
             <div class="footer">
@@ -253,3 +254,158 @@ def handle_lost_backstagepass(full_name: str = None, email_address: str = None):
         Försök igen senare eller kontakta Aristservice direkt."""
 
     return f"""Jag har nu skickat informationen till Artistservice. Kom in till Artistservice för att hämta ett nytt Backstagepass."""
+
+
+@tool
+def handle_work_certificate_request(certificate_type: Literal['arbetsintyg', 'arbetsbetyg'],
+                                    full_name: str,
+                                    email_address: str):
+    """
+    Handles the situation when an employee requests a work certificate.
+    The tool will guide the employee through the process of putting together the correct information to Artistservice.
+    The information will be used to send an email to Artistservice with the necessary information.
+
+    Args:
+        certificate_type (Literal): The type of certificate requested, either 'arbetsintyg' or 'arbetsbetyg'.
+        full_name (str): The full name of the employee.
+        email_address (str): The email address of the employee.
+
+    Returns:
+        str: A message informing if the message was sent successfully or not.
+    """
+
+    if not full_name:
+        return "För att skicka informationen till Artistservice behöver jag ditt fullständiga namn."
+    if not email_address:
+        return "För att skicka informationen till Artistservice behöver jag din mailadress."
+    if certificate_type not in ['arbetsintyg', 'arbetsbetyg']:
+        return "Vänligen ange vilken typ av intyg du önskar, antingen 'arbetsintyg' eller 'arbetsbetyg'."
+
+    message = Mail(
+        from_email="backster@parksandresorts.com",
+        to_emails=os.getenv("SEND_TO_EMAIL"),
+        subject=f"Backster: Begäran om {certificate_type}",
+        html_content=
+        f"""
+    <h1>Begäran om {certificate_type}</h1>
+        <p>Hej!</p>
+        <p><span class="highlight">{full_name}</span> önskar att få ett <span class="highlight">{certificate_type}</span> vid avslutad säsong.</p>
+        <p>Personens mail-adress är: <span class="highlight">{email_address}</span>.</p>
+            <p>Med vänliga hälsningar,</p>
+            <p>Backster Support</p>
+
+    """)
+    try:
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sg.send(message)
+
+        if response.status_code != 202:
+            raise Exception("Failed to send email")
+
+    except Exception as e:
+        return f"""Jag kunde tyvärr inte skicka informationen till Artistservice. 
+        Försök igen senare eller kontakta Artistservice direkt."""
+
+    return f"""Jag har nu skickat informationen till Artistservice. Dom kommer återkoppla till dig inom kort."""
+
+
+@tool
+def handle_give_away_shift(full_name: str, email_address: str, shift_date: str, shift_receiver_full_name: str,
+                           shift_receiver_email: str):
+    """
+    Handles the situation when an employee wants to give away a shift to another employee.
+    The tool will guide the employee through the process of putting together the correct information to Artistservice.
+    The information will be used to send an email to the employee that should take the shift, with the necessary information.
+
+    Args:
+        full_name (str): The full name of the employee that want to give away shift.
+        email_address (str): The email address of the employee that want to give away shift.
+        shift_date (str): The date of the shift to be given away.
+        shift_receiver_full_name (str): The full name of the employee who will receive the shift.
+        shift_receiver_email (str): The email address of the employee who will receive the shift.
+
+    Returns:
+        str: A message confirming if the message was sent successfully or not.
+    """
+
+    if not full_name:
+        return "För att skicka informationen till mottagaren behöver jag ditt fullständiga namn."
+    if not email_address:
+        return "För att skicka informationen till mottagaren behöver jag din mailadress."
+    if not shift_date:
+        return "Vilket datum är det för skiftet du vill ge bort?"
+    if not shift_receiver_full_name:
+        return "För att skicka informationen till mottagaren behöver jag mottagarens fullständiga namn."
+    if not shift_receiver_email:
+        return "För att skicka informationen till mottagaren behöver jag mottagarens mailadress."
+
+    message = Mail(
+        from_email="backster@parksandresorts.com",
+        to_emails=shift_receiver_email,
+        subject=f"Backster: {full_name} önskar ge bort ett pass",
+        html_content=f"""
+    <h1>Övertagande av arbetspass</h1>
+    <p>Hej <span class="highlight">{shift_receiver_full_name}</span>!</p>
+    <p>Din kollega <span class="highlight">{full_name}</span> har ett pass den <span class="highlight">{shift_date}</span> som hen önskar att du tar över.</p>
+    <p>För att bekräfta övertagandet, vänligen vidarebefordra detta e-postmeddelande till <span class="highlight">artistservice@parksandresorts.com</span>.</p>
+    <p>Om du har några frågor, tveka inte att kontakta Artistservice.</p>
+    <p>Med vänliga hälsningar,</p>
+    <p>Backster Support</p>""")
+
+    try:
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sg.send(message)
+
+        if response.status_code != 202:
+            raise Exception("Failed to send email")
+    except Exception as e:
+        return f"""Jag kunde tyvärr inte skicka informationen till mottagaren. 
+        Försök igen senare eller kontakta Artistservice"""
+
+    return f"""Jag har nu skickat din förfrågan till mottagaren."""
+
+
+@tool
+def handle_illness_insurance(full_name: str, email_address: str, sick_leave_dates: list[str]):
+    """
+    Handles the situation when an employee want to register a illness insurance.
+    The tool will guide the employee through the process of putting together the correct information to Artistservice.
+    The information will be used to send an email to Artistservice with the necessary information.
+
+    Args:
+        full_name (str): The full name of the employee.
+        email_address (str): The email address of the employee.
+        sick_leave_dates (list[str]): The date or dates of the sick leave.
+
+    Returns:
+        str: A message confirming if the message was sent successfully or not.
+    """
+
+    if not full_name:
+        return "För att skicka informationen till Artistservice behöver jag ditt fullständiga namn."
+    if not email_address:
+        return "För att skicka informationen till Artistservice behöver jag din mailadress."
+    if not sick_leave_dates:
+        return "Vilket/vilka datum var du hemma sjuk?"
+
+    sick_leave_dates = ", ".join(sick_leave_dates)
+
+    message = Mail(
+        from_email="backster@parksandresorts.com",
+        to_emails=os.getenv("SEND_TO_EMAIL"),
+        subject=f"Backster: Sjukförsäkran från {full_name}",
+        html_content=f"""{full_name} har varit hemma sjuk under följande datum: {sick_leave_dates}. Och önskar
+        att registrera en sjukdomsförsäkran. Kontakta {full_name} på {email_address} för ytterligare information.""")
+
+    try:
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        response = sg.send(message)
+
+        if response.status_code != 202:
+            raise Exception("Failed to send email")
+
+    except Exception as e:
+        return f"""Jag kunde tyvärr inte skicka informationen till Artistservice. 
+        Försök igen senare eller kontakta Artistservice direkt."""
+
+    return f"""Jag har nu skickat informationen till Artistservice."""
